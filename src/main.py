@@ -22,3 +22,21 @@ for ticker in stock_ticker:
 df['Close'].plot(kind='line', figsize=(8,4),title='appl Stock close ')
 plt.show()
 plt.savefig('AAPL_stock_close.png')
+
+# 데이터 전처리
+from sklearn.preprocessing import MinMaxScaler
+#0~1 사이로 정규화
+df = pd.read_csv(f'data/{ticker}_data.csv', index_col='Date', parse_dates = True)
+prices = df[['Close']].values #종가만 사용
+
+scaler = MinMaxScaler()
+prices_scaled = scaler.fit_transform(prices)
+
+
+#데이터 분할 (시계열이라 셔플 X)
+train_size = int(len(prices_scaled) * 0.8)
+val_size = int(len(prices_scaled) * 0.1)
+
+train = prices_scaled[:train_size]
+val = prices_scaled[train_size:train_size + val_size]
+test = prices_scaled[train_size + val_size:]
