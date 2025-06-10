@@ -1,5 +1,6 @@
 import pandas as pd
 import yfinance as yf
+import numpy as np
 import pandas_datareader as pdr
 import matplotlib.pyplot as plt
 import torch
@@ -19,24 +20,35 @@ for ticker in stock_ticker:
     df.to_csv(f'data/{ticker}_data.csv', index=True)
     print(f"{ticker}주가 저장완료") 
 
-df['Close'].plot(kind='line', figsize=(8,4),title='appl Stock close ')
-plt.show()
-plt.savefig('AAPL_stock_close.png')
+# df['Close'].plot(kind='line', figsize=(8,4),title='appl Stock close ')
+# plt.show()
+# plt.savefig('AAPL_stock_close.png')
 
 # 데이터 전처리
 from sklearn.preprocessing import MinMaxScaler
 #0~1 사이로 정규화
-df = pd.read_csv(f'data/{ticker}_data.csv', index_col='Date', parse_dates = True)
-prices = df[['Close']].values #종가만 사용
+def preprocess_data(ticker):
+    df = pd.read_csv(f'data/{ticker}_data.csv', header = 1, index_col='Date', parse_dates = ['Date'])
+    prices = df[['Close']].values #종가만 사용
 
-scaler = MinMaxScaler()
-prices_scaled = scaler.fit_transform(prices)
+    scaler = MinMaxScaler()
+    prices_scaled = scaler.fit_transform(prices)
 
 
-#데이터 분할 (시계열이라 셔플 X)
-train_size = int(len(prices_scaled) * 0.8)
-val_size = int(len(prices_scaled) * 0.1)
+    #데이터 분할 (시계열이라 셔플 X)
+    train_size = int(len(prices_scaled) * 0.8)
+    val_size = int(len(prices_scaled) * 0.1)
 
-train = prices_scaled[:train_size]
-val = prices_scaled[train_size:train_size + val_size]
-test = prices_scaled[train_size + val_size:]
+    train = prices_scaled[:train_size]
+    val = prices_scaled[train_size:train_size + val_size]
+    test = prices_scaled[train_size + val_size:]
+
+    np.save(f'data/{ticker}_train.npy', train)
+    np.save(f'data/{ticker}_val.npy', val)
+    np.save(f'data/{ticker}_test.npy', test)
+
+    print(f"{ticker}데이터 전처리 완료")
+    print(f"train: {len(train)}, val: {len(val)}, test: {len(test)}")
+    return train, val, test
+
+preprocess_data('AAPL')
