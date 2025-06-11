@@ -28,18 +28,20 @@ for ticker in stock_ticker:
 from sklearn.preprocessing import MinMaxScaler
 #0~1 사이로 정규화
 def preprocess_data(ticker):
-    df = pd.read_csv(f"data/{ticker}_data.csv", header=[0,1])
-    df.columns = df.columns.droplevel(0)  # 'Price' 등 상위 헤더 제거
-    df = df.rename(columns={'AAPL': 'Close'})  # 종가 열 이름 명시적으로 변경
-    df = df.rename_axis("Date").reset_index()
+    df = pd.read_csv(f"data/{ticker}_data.csv", header=[0, 1]) # 2중 헤더가 있는 CSV 파일을 읽어옴 (첫 번째 줄: 데이터 종류, 두 번째 줄: AAPL 등 Ticker)
+    df.columns = df.columns.droplevel(0) # 첫 번째 헤더 레벨(예: 'Price', 'Close', ...) 제거 → 실제 값이 있는 Ticker만 남김
+    df = df.rename(columns={'AAPL': 'Close'}) # 종가 데이터가 들어있는 첫 번째 'AAPL' 컬럼명을 'Close'로 명시적으로 변경
+    df = df.rename_axis("Date").reset_index()# 인덱스가 없을 경우를 대비해 'Date'라는 이름을 붙이고, 열로 되돌림
     df['Date'] = pd.to_datetime(df['Date'])
-    df = df.set_index('Date')
+    df = df.set_index('Date')# 'Date' 열을 DataFrame의 인덱스로 설정 → 시계열 데이터로 다루기 위함
+
+    df= df[['Close','High','Low','Open','volume']]
+    df = df.dropna()
 
     prices = df[['Close']].values #종가만 사용
 
     scaler = MinMaxScaler()
     prices_scaled = scaler.fit_transform(prices)
-
 
     #데이터 분할 (시계열이라 셔플 X)
     train_size = int(len(prices_scaled) * 0.8)
