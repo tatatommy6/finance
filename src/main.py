@@ -28,7 +28,13 @@ for ticker in stock_ticker:
 from sklearn.preprocessing import MinMaxScaler
 #0~1 사이로 정규화
 def preprocess_data(ticker):
-    df = pd.read_csv(f'data/{ticker}_data.csv', header = 1, index_col='Date', parse_dates = ['Date'])
+    df = pd.read_csv(f"data/{ticker}_data.csv", header=[0,1])
+    df.columns = df.columns.droplevel(0)  # 'Price' 등 상위 헤더 제거
+    df = df.rename(columns={'AAPL': 'Close'})  # 종가 열 이름 명시적으로 변경
+    df = df.rename_axis("Date").reset_index()
+    df['Date'] = pd.to_datetime(df['Date'])
+    df = df.set_index('Date')
+
     prices = df[['Close']].values #종가만 사용
 
     scaler = MinMaxScaler()
