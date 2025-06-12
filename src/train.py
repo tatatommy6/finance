@@ -4,88 +4,59 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
-
-win_size = 30
-batch_size_ = 32
-epochs = 30
-lr_ = 0.001
-
-train = np.load('data/AAPL_train.npy')
-val = np.load('data/AAPL_val.npy')
-test = np.load('data/AAPL_test.npy')
-
-
 device = 'mps' if torch.cuda.is_available() else 'cpu'
 print(f"device:{device}")
-print(np.min(train), np.max(train))
 
-def create_sequences(data, win_size):
-    X, y =[], []
-    for i in range(len(data)-win_size):
-        X.append(data[i:i+win_size])
-        y.append(data[i+win_size])
-    return np.array(X), np.array(y)
+X_train_tensors = torch.Tensor(preprocess_data.X_train)
+X_train_tensors = torch.Tensor(preprocess_data.X_train)
 
-class StockDataset(Dataset):
-    def __init__(self, X,y):
-        self.X = torch.tensor(X, dtype= torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32)
-    def __len__(self):
-        return len(self.X)
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx]
+y_train_tensors = torch.Tensor(preprocess_data.y_train)
+X_test_tensors = torch.Tensor(preprocess_data.X_test)
+
+X_train_tensors_f = torch.reshape(X_train_tensors, X_train_tensors.shape[0], 1, X_train_tensors.shape[1])
+X_test_tensors_f = torch.reshape(X_test_tensors, X_test_tensors.shape[0], 1, X_test_tensors.shape[1])
+
+print()
 
 class StockLSTM(nn.Module):
-    def __init__(self, input_size = 5, hidden_size = 50, num_layers = 2):
+    def __init__(self, num_classes, input_size, hidden_size, num_layers, seq_length):
         super(StockLSTM, self).__init__() #상속한 nn.Module의 초기화 메서드 호출
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, 5)
+        self.num_classes = num_classes
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.seq_length = seq_length
+
+        # LSTM 레이어 정의
+        self.lstm = nn.LSTM(input_size = input_size, hidden_size = hidden_size, num_layers = num_layers, batch_first = True)
+        self.fc_1 = nn.Linear(hidden_size, 128)
+        self.fc = nn.Linear(128, num_classes)
+        self.relu = nn.ReLU()
 
     def forward(self, x ):
-        out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :])
+        h_0 = torch.zeros(self.num_layers, x.size(0), self.jidden_size).requires_grad_()
+        c_0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).requires_grad_()
+        out, (h_n, c_n) = self.lstm(x, (h_0, c_0))  # LSTM 레이어 통과
+        #최종 은닉 상태를 완전 연결층에 입력하기 위해 2차원 텐서로 변환
+        hn = hn[-1] #최종 lstm 층의 마지막 은닉 상태만 사용함
+
+        out = self.relu(hn)
+        out = self.fc_1(out)  # 완전 연결층 통과
+        out = self.relu(out)
+
+        out = self.fc(out)  # 최종 출력층 통과
+
         return out
     
-X_train ,y_train= create_sequences(train,win_size)
-X_val ,y_val = create_sequences(val, win_size)
+num_epochs = 10000
+lr = 0.0001
 
-print("Train shape:", X_train.shape, y_train.shape)
-print("Val shape:", X_val.shape, y_val.shape)
-print("Sample input:", X_train[0])
-print("Sample target:", y_train[0])
+input_size = 5
+hidden_size = 64
+num_layers = 1
+num_classes = 1
 
-train_loader = torch.utils.data.DataLoader(StockDataset(X_train, y_train), batch_size = batch_size_, shuffle = False)
-val_loader = torch.utils.data.DataLoader(StockDataset(X_val, y_val),batch_size = batch_size_, shuffle = False)
-
-model = StockLSTM()
-cirterion = nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr = lr_)
-
-print(len(val_loader))
-
-for epoch in range(epochs):
-    model.train()
-    epoch_loss = 0
-
-    for X_batch, y_batch in train_loader:
-
-        optimizer.zero_grad()
-        output = model(X_batch)
-        loss = cirterion(output, y_batch)
-        loss.backward()
-        optimizer.step()
-        epoch_loss += loss.item()
-        epoch_loss = len(train_loader)
-    val_loss = 0
-
-    model.eval()
-    with torch.no_grad():
-        for X_batch, y_batch in val_loader:
-            output = model(X_batch)
-            loss = cirterion(output, y_batch)
-            val_loss += loss.item()
-
-    print(f"Epoch {epoch+1}/{epochs}, Train Loss : {epoch_loss/len(train_loader):.4f} Val Loss: {val_loss/len(val_loader):.4f}")
+model = StockLSTM(num_classes, input_size, hidden_size, num_layers, X_train_tensors_f.shape[1])
 
 # 모델 저장
 torch.save(model.state_dict(), 'model/stock_lstm.pth')
